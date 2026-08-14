@@ -38,7 +38,7 @@ if not ADMIN_ID_RAW:
 ADMIN_ID = int(ADMIN_ID_RAW)
 NETLIFY_URL = "https://gemini18oytekin.netlify.app"
 
-# --- Foydalanuvchilarni saqlash bazasi (oddiy faylda) ---
+# --- Foydalanuvchilarni saqlash bazasi ---
 USERS_FILE = Path("users.json")
 
 
@@ -52,12 +52,14 @@ def load_users():
 
 
 def save_user(user_id: int):
-    users = load_users()
-    users.add(user_id)
-    USERS_FILE.write_text(json.dumps(list(users)))
+    try:
+        users = load_users()
+        users.add(user_id)
+        USERS_FILE.write_text(json.dumps(list(users)))
+    except Exception:
+        pass
 
 
-# Admin xabar yuborish rejimi holati
 BROADCAST_STATE = {}
 
 tg_app = Application.builder().token(TOKEN).build()
@@ -166,6 +168,8 @@ tg_app.add_handler(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await tg_app.initialize()
+    # Eski webhooklarni tozalash (Bot javob bermasligini oldini oladi)
+    await tg_app.bot.delete_webhook(drop_pending_updates=True)
     await tg_app.start()
     await tg_app.updater.start_polling()
     yield
