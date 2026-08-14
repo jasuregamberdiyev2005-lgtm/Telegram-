@@ -26,7 +26,7 @@ from telegram.ext import (
     filters,
 )
 
-# Terminalda loglarni ko'rish uchun logging
+# Terminalda loglarni ko'rish uchun
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -139,16 +139,15 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # A) Rasmga olish linki (Nusxalash oson bo'lishi uchun matn ko'rinishida)
     if text == "📸 Rasmga olish linki":
         personal_link = f"{NETLIFY_URL}/?uid={user_id}"
-        inline_kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🌐 Kamerani ochish", url=personal_link)]]
-        )
         await update.message.reply_text(
-            "👇 Kamerani ishga tushirish uchun quyidagi tugmani bosing:",
-            reply_markup=inline_kb,
+            f"👇 **Kamerani ishga tushirish uchun link:**\n\n`{personal_link}`\n\n*(Ustiga bir marta bossangiz nusxalanadi)*",
+            parse_mode="Markdown",
         )
 
+    # B) Admin: Statistika
     elif text == "📊 Statistika" and user_id == ADMIN_ID:
         users = load_users()
         await update.message.reply_text(
@@ -156,6 +155,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
 
+    # C) Admin: Xabar yuborish
     elif text == "📢 Xabar yuborish" and user_id == ADMIN_ID:
         BROADCAST_STATE[user_id] = True
         await update.message.reply_text(
