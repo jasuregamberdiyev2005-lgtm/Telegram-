@@ -11,8 +11,8 @@ from telegram import Bot
 
 load_dotenv()
 
-TOKEN = os.environ["BOT_TOKEN"]
-ADMIN_ID = int(os.environ["ADMIN_ID"])
+TOKEN = os.environ["8647124051:AAHlPDOpMohqUT2-F2lcAsEpCxub-mdlZgE"]
+ADMIN_ID = int(os.environ["5203992395"])
 
 app = FastAPI()
 app.add_middleware(
