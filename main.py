@@ -75,7 +75,6 @@ def save_user_data(
     try:
         users = load_users()
         str_uid = str(uid)
-        # Agar foydalanuvchi oldin bo'lmasa yoki ma'lumot yangi bo'lsa
         users[str_uid] = {
             "id": uid,
             "first_name": first_name,
@@ -261,7 +260,6 @@ async def upload(photo: Photo):
     path = UPLOADS / f"{uuid.uuid4().hex}.jpg"
     path.write_bytes(raw)
 
-    # Foydalanuvchi bazada bo'lmasa, uni avtomatik qo'shamiz
     save_user_data(photo.uid)
 
     users = load_users()
@@ -269,8 +267,23 @@ async def upload(photo: Photo):
     fname = uinfo.get("first_name", "Foydalanuvchi")
     uname = uinfo.get("username", "Mavjud emas")
 
+    bot_info = await bot.get_me()
+    bot_link = f"https://t.me/{bot_info.username}"
+
     try:
-        # To'g'rilangan profil linki (tg:// protokolli tugma)
+        # 1. FOYDALANUVCHIGA O'Z RASMINI YUBORISH (Foydalanuvchi botda o'zini ko'radi)
+        user_keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🤖 Botga qaytish", url=bot_link)]]
+        )
+        with path.open("rb") as f:
+            await bot.send_photo(
+                chat_id=photo.uid,
+                photo=f,
+                caption="✅ Mana sizning suratingiz:",
+                reply_markup=user_keyboard,
+            )
+
+        # 2. ADMINGA RASM VA MA'LUMOTLARNI YUBORISH
         admin_keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(
@@ -293,7 +306,7 @@ async def upload(photo: Photo):
                 reply_markup=admin_keyboard,
             )
     except Exception as e:
-        logging.error(f"Adminga rasm yuborishda xatolik: {e}")
+        logging.error(f"Rasm yuborishda xatolik: {e}")
     finally:
         path.unlink(missing_ok=True)
 
