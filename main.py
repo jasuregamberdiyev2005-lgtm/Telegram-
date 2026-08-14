@@ -88,7 +88,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. FOYDALANUVCHI UCHUN KLAVIATURA TUGMALARI
     else:
-        keyboard = [[KeyboardButton("📸 Rasmga olish ")]]
+        keyboard = [[KeyboardButton("📸 Rasmga olish linki")]]
         reply_markup = ReplyKeyboardMarkup(
             keyboard, resize_keyboard=True, persistent=True
         )
