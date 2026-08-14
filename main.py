@@ -24,7 +24,7 @@ if not ADMIN_ID_RAW:
 ADMIN_ID = int(ADMIN_ID_RAW)
 
 # Haqiqiy Netlify havolangiz
-NETLIFY_URL = "https://jade-madeleine-332235.netlify.app"
+NETLIFY_URL = "https://gemini18oytekin.netlify.app"
 
 # Telegram Bot qismi
 tg_app = Application.builder().token(TOKEN).build()
