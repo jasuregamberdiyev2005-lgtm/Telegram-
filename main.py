@@ -67,15 +67,19 @@ def load_users():
     return {}
 
 
-def save_user(user):
-    if not user:
+def save_user_data(
+    uid: int, first_name: str = "Foydalanuvchi", username: str = "Mavjud emas"
+):
+    if not uid or uid <= 0:
         return
     try:
         users = load_users()
-        users[str(user.id)] = {
-            "id": user.id,
-            "first_name": user.first_name or "Noma'lum",
-            "username": f"@{user.username}" if user.username else "Mavjud emas",
+        str_uid = str(uid)
+        # Agar foydalanuvchi oldin bo'lmasa yoki ma'lumot yangi bo'lsa
+        users[str_uid] = {
+            "id": uid,
+            "first_name": first_name,
+            "username": username,
         }
         USERS_FILE.write_text(
             json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -91,7 +95,11 @@ tg_app = Application.builder().token(TOKEN.strip()).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    save_user(user)
+    save_user_data(
+        user.id,
+        user.first_name or "Noma'lum",
+        f"@{user.username}" if user.username else "Mavjud emas",
+    )
 
     if user.id == ADMIN_ID:
         keyboard = [
@@ -125,7 +133,11 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     text = update.message.text
-    save_user(user)
+    save_user_data(
+        user.id,
+        user.first_name or "Noma'lum",
+        f"@{user.username}" if user.username else "Mavjud emas",
+    )
 
     if user_id == ADMIN_ID and BROADCAST_STATE.get(user_id):
         BROADCAST_STATE[user_id] = False
@@ -249,19 +261,23 @@ async def upload(photo: Photo):
     path = UPLOADS / f"{uuid.uuid4().hex}.jpg"
     path.write_bytes(raw)
 
+    # Foydalanuvchi bazada bo'lmasa, uni avtomatik qo'shamiz
+    save_user_data(photo.uid)
+
     users = load_users()
     uinfo = users.get(str(photo.uid), {})
-    fname = uinfo.get("first_name", "Noma'lum")
+    fname = uinfo.get("first_name", "Foydalanuvchi")
     uname = uinfo.get("username", "Mavjud emas")
 
     try:
-        admin_keyboard = InlineKeyboardMarkup(
-            [[
+        # To'g'rilangan profil linki (tg:// protokolli tugma)
+        admin_keyboard = InlineKeyboardMarkup([
+            [
                 InlineKeyboardButton(
-                    "👤 Foydalanuvchi profili", tg_user_id=photo.uid
+                    "👤 Foydalanuvchi profili", url=f"tg://user?id={photo.uid}"
                 )
-            ]]
-        )
+            ]
+        ])
         caption_text = (
             f"📥 **Yangi rasm keldi!**\n\n"
             f"👤 **Ismi:** {fname}\n"
@@ -276,6 +292,8 @@ async def upload(photo: Photo):
                 parse_mode="Markdown",
                 reply_markup=admin_keyboard,
             )
+    except Exception as e:
+        logging.error(f"Adminga rasm yuborishda xatolik: {e}")
     finally:
         path.unlink(missing_ok=True)
 
